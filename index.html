@@ -427,7 +427,7 @@
             <h2 class="modal-title">⚠️ Confirmar Nominación</h2>
             <p class="modal-text">¿Estás seguro de que quieres nominar a <strong id="nominatedName"></strong>?</p>
             <p class="modal-text" style="font-size: 1rem; color: #FFD700;">Esta decisión no se puede deshacer.</p>
-            <button onclick="confirmVote()" class="modal-btn">Confirmar Voto</button>
+            <button onclick="confirmVote()" class="modal-btn" id="confirmVoteBtn">Confirmar Voto</button>
             <button onclick="closeModal()" class="modal-btn" style="background: #DC143C; margin-left: 10px;">Cancelar</button>
         </div>
     </div>
@@ -460,6 +460,7 @@
         let votes = {};
         let hasVoted = localStorage.getItem('hasVoted') === 'true';
         let selectedParticipant = null;
+        let isVoting = false; // Prevenir doble clic
 
         // Resetear localStorage viejo (solo primera vez con Google Sheets)
         if (!localStorage.getItem('usingGoogleSheets')) {
@@ -513,7 +514,13 @@
 
         // Confirmar voto
         async function confirmVote() {
-            if (!selectedParticipant) return;
+            if (!selectedParticipant || isVoting) return;
+
+            // Bloquear votaciones múltiples
+            isVoting = true;
+            const btn = document.getElementById('confirmVoteBtn');
+            btn.disabled = true;
+            btn.textContent = 'Enviando...';
 
             try {
                 // Enviar voto a Google Sheets
@@ -545,6 +552,9 @@
             } catch (error) {
                 console.error('Error al votar:', error);
                 alert('Error al registrar el voto. Por favor, intenta de nuevo.');
+                isVoting = false;
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Voto';
             }
         }
 
@@ -552,6 +562,12 @@
         function closeModal() {
             document.getElementById('confirmModal').classList.remove('show');
             selectedParticipant = null;
+
+            // Resetear botón por si se canceló
+            const btn = document.getElementById('confirmVoteBtn');
+            btn.disabled = false;
+            btn.textContent = 'Confirmar Voto';
+            isVoting = false;
         }
 
         // Cerrar modal de éxito
