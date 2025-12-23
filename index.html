@@ -444,24 +444,34 @@
     </div>
 
     <script>
+        // URL de Google Apps Script
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlcpI0tBxu4qLhTc2IJz_cDHR46HTV-rzdRRbS30T_yQxTycgYy4Hf-JZJWo3qkJNpEA/exec';
+
         // Lista de participantes
         const participants = [
             'ASIER', 'NACHO', 'NESTOR', 'AITOR', 'ABUELO', 'ABUELI',
             'UNAI', 'GEMA', 'LUIS', 'EVA', 'MIGUEL', 'SOFIA', 'ZIHARA', 'MARIA'
         ];
 
-        // Contraseña de administrador (cambiar por una segura)
+        // Contraseña de administrador
         const ADMIN_PASSWORD = 'supervivientes2024';
 
-        // Inicializar votos desde localStorage
-        let votes = JSON.parse(localStorage.getItem('votes')) || {};
+        // Variables globales
+        let votes = {};
         let hasVoted = localStorage.getItem('hasVoted') === 'true';
         let selectedParticipant = null;
 
-        // Inicializar votos si no existen
-        participants.forEach(p => {
-            if (!votes[p]) votes[p] = 0;
-        });
+        // Cargar votos desde Google Sheets
+        async function loadVotes() {
+            try {
+                const response = await fetch(SCRIPT_URL);
+                votes = await response.json();
+                loadParticipants();
+            } catch (error) {
+                console.error('Error al cargar votos:', error);
+                alert('Error al cargar los datos. Por favor, recarga la página.');
+            }
+        }
 
         // Cargar participantes en la página
         function loadParticipants() {
@@ -494,27 +504,40 @@
         }
 
         // Confirmar voto
-        function confirmVote() {
+        async function confirmVote() {
             if (!selectedParticipant) return;
 
-            // Registrar voto
-            votes[selectedParticipant]++;
-            hasVoted = true;
+            try {
+                // Enviar voto a Google Sheets
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'vote',
+                        participant: selectedParticipant
+                    })
+                });
 
-            // Guardar en localStorage
-            localStorage.setItem('votes', JSON.stringify(votes));
-            localStorage.setItem('hasVoted', 'true');
+                hasVoted = true;
+                localStorage.setItem('hasVoted', 'true');
 
-            // Cerrar modal de confirmación
-            closeModal();
+                // Cerrar modal de confirmación
+                closeModal();
 
-            // Mostrar modal de éxito
-            setTimeout(() => {
-                document.getElementById('successModal').classList.add('show');
-            }, 300);
+                // Mostrar modal de éxito
+                setTimeout(() => {
+                    document.getElementById('successModal').classList.add('show');
+                }, 300);
 
-            // Actualizar interfaz
-            loadParticipants();
+                // Recargar votos y actualizar interfaz
+                await loadVotes();
+            } catch (error) {
+                console.error('Error al votar:', error);
+                alert('Error al registrar el voto. Por favor, intenta de nuevo.');
+            }
         }
 
         // Cerrar modal de confirmación
@@ -529,7 +552,7 @@
         }
 
         // Mostrar resultados (solo admin)
-        function showResults() {
+        async function showResults() {
             const password = document.getElementById('adminPassword').value;
 
             if (password !== ADMIN_PASSWORD) {
@@ -537,11 +560,14 @@
                 return;
             }
 
+            // Recargar votos antes de mostrar
+            await loadVotes();
+
             const resultsDiv = document.getElementById('results');
             const resultsContent = document.getElementById('resultsContent');
 
             // Ordenar participantes por votos
-            const sortedParticipants = participants.slice().sort((a, b) => votes[b] - votes[a]);
+            const sortedParticipants = participants.slice().sort((a, b) => (votes[b] || 0) - (votes[a] || 0));
 
             // Calcular total de votos
             const totalVotes = Object.values(votes).reduce((a, b) => a + b, 0);
@@ -550,7 +576,7 @@
             let html = `<p style="color: #FFD700; font-size: 1.2rem; margin-bottom: 20px;">Total de votos: ${totalVotes}</p>`;
 
             sortedParticipants.forEach(name => {
-                const voteCount = votes[name];
+                const voteCount = votes[name] || 0;
                 const percentage = totalVotes > 0 ? (voteCount / totalVotes * 100).toFixed(1) : 0;
 
                 html += `
@@ -569,7 +595,7 @@
         }
 
         // Resetear todos los votos (solo admin)
-        function resetVotes() {
+        async function resetVotes() {
             const password = document.getElementById('adminPassword').value;
 
             if (password !== ADMIN_PASSWORD) {
@@ -581,21 +607,35 @@
                 return;
             }
 
-            // Resetear votos
-            participants.forEach(p => votes[p] = 0);
-            localStorage.setItem('votes', JSON.stringify(votes));
+            try {
+                // Enviar comando de reset a Google Sheets
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'reset',
+                        password: ADMIN_PASSWORD
+                    })
+                });
 
-            // Permitir votar de nuevo
-            hasVoted = false;
-            localStorage.setItem('hasVoted', 'false');
+                // Permitir votar de nuevo (borrar solo de localStorage local)
+                hasVoted = false;
+                localStorage.setItem('hasVoted', 'false');
 
-            // Limpiar resultados
-            document.getElementById('results').classList.remove('show');
+                // Limpiar resultados
+                document.getElementById('results').classList.remove('show');
 
-            // Recargar participantes para habilitar los botones
-            loadParticipants();
+                // Recargar votos y participantes
+                await loadVotes();
 
-            alert('✅ Todos los votos han sido reseteados');
+                alert('✅ Todos los votos han sido reseteados');
+            } catch (error) {
+                console.error('Error al resetear:', error);
+                alert('Error al resetear los votos. Por favor, intenta de nuevo.');
+            }
         }
 
         // Cerrar modales al hacer clic fuera de ellos
@@ -611,8 +651,8 @@
             }
         }
 
-        // Cargar participantes al iniciar
-        loadParticipants();
+        // Cargar votos al iniciar
+        loadVotes();
     </script>
 </body>
 </html>
