@@ -461,6 +461,14 @@
         let hasVoted = localStorage.getItem('hasVoted') === 'true';
         let selectedParticipant = null;
 
+        // Resetear localStorage viejo (solo primera vez con Google Sheets)
+        if (!localStorage.getItem('usingGoogleSheets')) {
+            localStorage.removeItem('hasVoted');
+            localStorage.removeItem('votes');
+            localStorage.setItem('usingGoogleSheets', 'true');
+            hasVoted = false;
+        }
+
         // Cargar votos desde Google Sheets
         async function loadVotes() {
             try {
