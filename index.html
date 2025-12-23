@@ -585,8 +585,15 @@
             participants.forEach(p => votes[p] = 0);
             localStorage.setItem('votes', JSON.stringify(votes));
 
+            // Permitir votar de nuevo
+            hasVoted = false;
+            localStorage.setItem('hasVoted', 'false');
+
             // Limpiar resultados
             document.getElementById('results').classList.remove('show');
+
+            // Recargar participantes para habilitar los botones
+            loadParticipants();
 
             alert('✅ Todos los votos han sido reseteados');
         }
